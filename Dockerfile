@@ -1,29 +1,25 @@
-# SearXNG Dockerfile for Render.com (WORKING)
 FROM python:3.11-slim
-
 ENV PYTHONUNBUFFERED=1
 ENV SEARXNG_SETTINGS_PATH=/etc/searxng/settings.yml
 
-# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libffi-dev \
     libxslt-dev \
     libxml2-dev \
     libssl-dev \
-    git \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Clone SearXNG
-RUN git clone --depth 1 https://github.com/searxng/searxng.git . && \
-    rm -rf .git
+# Clone but KEEP .git so version detection works
+RUN apt-get update && apt-get install -y --no-install-recommends git \
+    && git clone --depth 1 https://github.com/searxng/searxng.git . \
+    && apt-get purge -y git \
+    && rm -rf /var/lib/apt/lists/*
 
-# Create settings directory and file FIRST (before pip install!)
 RUN mkdir -p /etc/searxng
 
-# Create settings file with JSON API enabled
 RUN printf 'use_default_settings: true\n\
 general:\n\
   instance_name: "SearXNG"\n\
@@ -42,20 +38,23 @@ search:\n\
     - json\n\
 outgoing:\n\
   request_timeout: 10.0\n\
+engines:\n\
+  - name: wikidata\n\
+    disabled: true\n\
+  - name: ahmia\n\
+    disabled: true\n\
+  - name: torch\n\
+    disabled: true\n\
 ' > /etc/searxng/settings.yml
 
-# Upgrade pip first
+# Create empty limiter.toml to silence the warning
+RUN printf '[botdetection.ip_limit]\nenabled = false\n[botdetection.ip_lists]\nenabled = false\n' \
+    > /etc/searxng/limiter.toml
+
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
-
-# Install msgspec BEFORE anything else (required by setup.py)
 RUN pip install --no-cache-dir msgspec
-
-# Install all requirements
 RUN pip install --no-cache-dir -r requirements.txt
-
-# Install SearXNG without build isolation (uses already installed packages)
 RUN pip install --no-cache-dir --no-build-isolation -e .
 
 EXPOSE 8080
-
 CMD ["python", "-m", "searx.webapp"]
