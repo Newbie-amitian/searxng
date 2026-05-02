@@ -8,15 +8,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxslt-dev \
     libxml2-dev \
     libssl-dev \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Clone but KEEP .git so version detection works
-RUN apt-get update && apt-get install -y --no-install-recommends git \
-    && git clone --depth 1 https://github.com/searxng/searxng.git . \
-    && apt-get purge -y git \
-    && rm -rf /var/lib/apt/lists/*
+RUN git clone --depth 1 https://github.com/searxng/searxng.git .
 
 RUN mkdir -p /etc/searxng
 
@@ -47,14 +44,18 @@ engines:\n\
     disabled: true\n\
 ' > /etc/searxng/settings.yml
 
-# Create empty limiter.toml to silence the warning
 RUN printf '[botdetection.ip_limit]\nenabled = false\n[botdetection.ip_lists]\nenabled = false\n' \
     > /etc/searxng/limiter.toml
 
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 RUN pip install --no-cache-dir msgspec
 RUN pip install --no-cache-dir -r requirements.txt
+
+# git must still be present here for version.py to work
 RUN pip install --no-cache-dir --no-build-isolation -e .
+
+# NOW safe to remove git (optional, saves ~50MB)
+RUN apt-get purge -y git && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
 
 EXPOSE 8080
 CMD ["python", "-m", "searx.webapp"]
