@@ -1,4 +1,4 @@
-# SearXNG Dockerfile for Render.com (FINAL FIX)
+# SearXNG Dockerfile for Render.com (WORKING)
 FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1
@@ -20,19 +20,7 @@ WORKDIR /app
 RUN git clone --depth 1 https://github.com/searxng/searxng.git . && \
     rm -rf .git
 
-# Upgrade pip first
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel
-
-# Install msgspec BEFORE anything else (required by setup.py)
-RUN pip install --no-cache-dir msgspec
-
-# Install all requirements
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Install SearXNG without build isolation (uses already installed packages)
-RUN pip install --no-cache-dir --no-build-isolation -e .
-
-# Create settings directory
+# Create settings directory and file FIRST (before pip install!)
 RUN mkdir -p /etc/searxng
 
 # Create settings file with JSON API enabled
@@ -55,6 +43,18 @@ search:\n\
 outgoing:\n\
   request_timeout: 10.0\n\
 ' > /etc/searxng/settings.yml
+
+# Upgrade pip first
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# Install msgspec BEFORE anything else (required by setup.py)
+RUN pip install --no-cache-dir msgspec
+
+# Install all requirements
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install SearXNG without build isolation (uses already installed packages)
+RUN pip install --no-cache-dir --no-build-isolation -e .
 
 EXPOSE 8080
 
