@@ -1,27 +1,37 @@
-# SearXNG Dockerfile for Render.com
+# SearXNG Dockerfile for Render.com (FIXED)
 FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1
 ENV SEARXNG_SETTINGS_PATH=/etc/searxng/settings.yml
 
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libffi-dev \
     libxslt-dev \
     libxml2-dev \
-    openssl \
+    libssl-dev \
     git \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
+# Clone SearXNG
 RUN git clone --depth 1 https://github.com/searxng/searxng.git . && \
     rm -rf .git
 
+# Install dependencies FIRST (fixes msgspec error)
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir msgspec && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Now install SearXNG
 RUN pip install --no-cache-dir -e .
 
+# Create settings directory
 RUN mkdir -p /etc/searxng
 
+# Create settings file with JSON API enabled
 RUN printf 'use_default_settings: true\n\
 general:\n\
   instance_name: "SearXNG"\n\
