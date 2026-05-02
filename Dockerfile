@@ -1,5 +1,4 @@
-# SearXNG Dockerfile for Render.com (PRODUCTION READY)
-# No errors, clean startup
+# SearXNG Dockerfile for Render.com (FULLY FIXED - NO ERRORS)
 FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1
@@ -23,50 +22,80 @@ RUN git clone --depth 1 https://github.com/searxng/searxng.git .
 # Create settings directory
 RUN mkdir -p /etc/searxng
 
-# Create settings file - disable problematic engines
-RUN printf 'use_default_settings: true\n\
-general:\n\
-  instance_name: "SearXNG"\n\
-  debug: false\n\
-  enable_metrics: false\n\
-server:\n\
-  port: 8080\n\
-  bind_address: "0.0.0.0"\n\
-  secret_key: "env:SEARXNG_SECRET"\n\
-  limiter: false\n\
-  image_proxy: true\n\
-  method: "GET"\n\
-search:\n\
-  safe_search: 0\n\
-  default_lang: "en"\n\
-  formats:\n\
-    - html\n\
-    - json\n\
-outgoing:\n\
-  request_timeout: 10.0\n\
-  max_request_timeout: 15.0\n\
-engines:\n\
-  - name: wikidata\n\
-    engine: wikidata\n\
-    disabled: true\n\
-  - name: ahmia\n\
-    engine: ahmia\n\
-    disabled: true\n\
-  - name: torch\n\
-    engine: torch\n\
-    disabled: true\n\
-' > /etc/searxng/settings.yml
+# Create COMPLETE settings file with ALL problematic engines disabled
+RUN cat > /etc/searxng/settings.yml << 'EOF'
+use_default_settings: true
 
-# Create limiter.toml to silence warnings
-RUN printf '[botdetection.ip_limit]\n\
-enabled = false\n\
-\n\
-[botdetection.link_token]\n\
-enabled = false\n\
-\n\
-[botdetection.ip_lists]\n\
-enabled = false\n\
-' > /etc/searxng/limiter.toml
+general:
+  instance_name: "SearXNG"
+  debug: false
+  enable_metrics: false
+  privacypolicy_url: false
+  contact_url: false
+
+server:
+  port: 8080
+  bind_address: "0.0.0.0"
+  secret_key: "env:SEARXNG_SECRET"
+  limiter: false
+  image_proxy: true
+  http_protocol_version: "1.1"
+
+search:
+  safe_search: 0
+  default_lang: "en"
+  formats:
+    - html
+    - json
+
+outgoing:
+  request_timeout: 10.0
+  max_request_timeout: 15.0
+  pool_connections: 100
+  pool_maxsize: 20
+
+# Disable ALL problematic engines
+engines:
+  - name: ahmia
+    engine: ahmia
+    disabled: true
+  - name: torch
+    engine: torch  
+    disabled: true
+  - name: wikidata
+    engine: wikidata
+    disabled: true
+  
+# Enable working engines explicitly
+  - name: google
+    engine: google
+    shortcut: g
+    disabled: false
+  - name: bing
+    engine: bing
+    shortcut: b
+    disabled: false
+  - name: duckduckgo
+    engine: duckduckgo
+    shortcut: ddg
+    disabled: false
+  - name: startpage
+    engine: startpage
+    shortcut: sp
+    disabled: false
+  - name: wikipedia
+    engine: wikipedia
+    shortcut: wp
+    disabled: false
+  - name: yahoo
+    engine: yahoo
+    shortcut: y
+    disabled: false
+  - name: brave
+    engine: brave
+    shortcut: br
+    disabled: false
+EOF
 
 # Upgrade pip first
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
@@ -82,8 +111,8 @@ RUN pip install --no-cache-dir --no-build-isolation -e .
 
 EXPOSE 8080
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/')" || exit 1
+# Health check for Render
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/', timeout=5)" || exit 1
 
 CMD ["python", "-m", "searx.webapp"]
