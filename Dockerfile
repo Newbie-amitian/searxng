@@ -50,12 +50,12 @@ RUN printf '[botdetection.ip_limit]\nenabled = false\n[botdetection.ip_lists]\ne
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 RUN pip install --no-cache-dir msgspec
 RUN pip install --no-cache-dir -r requirements.txt
-
-# git must still be present here for version.py to work
 RUN pip install --no-cache-dir --no-build-isolation -e .
 
-# NOW safe to remove git (optional, saves ~50MB)
-RUN apt-get purge -y git && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
+# Freeze version so git is never needed at runtime
+RUN python -c "from searx.version import VERSION_STRING, VERSION_TAG, DOCKER_TAG, GIT_URL, GIT_BRANCH; \
+    content = f'VERSION_STRING=\"{VERSION_STRING}\"\nVERSION_TAG=\"{VERSION_TAG}\"\nDOCKER_TAG=\"{DOCKER_TAG}\"\nGIT_URL=\"{GIT_URL}\"\nGIT_BRANCH=\"{GIT_BRANCH}\"\n'; \
+    open('/app/searx/version_frozen.py', 'w').write(content)"
 
 EXPOSE 8080
 CMD ["python", "-m", "searx.webapp"]
